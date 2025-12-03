@@ -10,6 +10,11 @@ import javax.swing.event.ChangeListener;
 
 public class ColorConverterApp extends JFrame {
 
+    // Источники изменений
+    private enum ChangeSource {
+        RGB, CMYK, HSV, EXTERNAL
+    }
+
     private boolean isUpdating = false;
 
     private JPanel colorPreviewPanel;
@@ -43,7 +48,7 @@ public class ColorConverterApp extends JFrame {
         setLocationRelativeTo(null);
         setLayout(new BorderLayout(10, 10));
 
-        // --- 1. ВЕРХНЯЯ ЧАСТЬ ---
+        // Верхняя
         JPanel topPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 30, 15));
         
         colorPreviewPanel = new JPanel();
@@ -77,7 +82,7 @@ public class ColorConverterApp extends JFrame {
                 new JTextField[]{tC, tM, tY, tK}));
 
         mainPanel.add(createModelPanel("HSV Model", 
-                new String[]{"Hue (0-359)", "Sat (0-100)", "Val (0-100)"}, 
+                new String[]{"Hue (0-360)", "Sat (0-100)", "Val (0-100)"}, 
                 new JSlider[]{sH, sS, sV}, 
                 new JTextField[]{tH, tS, tV}));
 
@@ -87,7 +92,7 @@ public class ColorConverterApp extends JFrame {
         setupListeners();
 
         // Начальный цвет
-        updateAllFromColor(new Color(204, 163, 82)); 
+        updateAllFromColor(new Color(204, 163, 82), ChangeSource.EXTERNAL); 
     }
 
     private void initComponents() {
@@ -149,7 +154,6 @@ public class ColorConverterApp extends JFrame {
         return wrapper;
     }
 
-    // Продолжение
     private void setupListeners() {
         paletteButton.addActionListener(e -> {
             JColorChooser chooser = new JColorChooser(colorPreviewPanel.getBackground());
@@ -161,7 +165,7 @@ public class ColorConverterApp extends JFrame {
                 }
             }
             JDialog dialog = JColorChooser.createDialog(this, "Выберите цвет", true, chooser, 
-                ok -> updateAllFromColor(chooser.getColor()), null);
+                ok -> updateAllFromColor(chooser.getColor(), ChangeSource.EXTERNAL), null);
             dialog.setVisible(true);
         });
 
@@ -195,10 +199,17 @@ public class ColorConverterApp extends JFrame {
         });
     }
 
-    // Обработка изменений
+    // Методы обработки ввода
     private void updateFromRGBInputs() {
         if (isUpdating) return;
-        updateAllFromColor(new Color(sR.getValue(), sG.getValue(), sB.getValue()));
+        
+        // Синхронизизация полей модели RGB
+        tR.setText(String.valueOf(sR.getValue()));
+        tG.setText(String.valueOf(sG.getValue()));
+        tB.setText(String.valueOf(sB.getValue()));
+
+        // Обновление остальных моделей
+        updateAllFromColor(new Color(sR.getValue(), sG.getValue(), sB.getValue()), ChangeSource.RGB);
     }
 
     private void validateAndUpdateRGB() {
@@ -215,17 +226,24 @@ public class ColorConverterApp extends JFrame {
 
     private void updateFromCMYKInputs() {
         if (isUpdating) return;
+
+        // Синхронизизация полей модели CMYK
+        tC.setText(String.valueOf(sC.getValue()));
+        tM.setText(String.valueOf(sM.getValue()));
+        tY.setText(String.valueOf(sY.getValue()));
+        tK.setText(String.valueOf(sK.getValue()));
+
         double c = sC.getValue() / 100.0;
         double m = sM.getValue() / 100.0;
         double y = sY.getValue() / 100.0;
         double k = sK.getValue() / 100.0;
 
-        // Округление для точного обратного пересчета
         int r = (int) Math.round((1 - c) * (1 - k) * 255);
         int g = (int) Math.round((1 - m) * (1 - k) * 255);
         int b = (int) Math.round((1 - y) * (1 - k) * 255);
         
-        updateAllFromColor(new Color(clamp(r,0,255), clamp(g,0,255), clamp(b,0,255)));
+        // Обновление остальных моделей
+        updateAllFromColor(new Color(clamp(r,0,255), clamp(g,0,255), clamp(b,0,255)), ChangeSource.CMYK);
     }
 
     private void validateAndUpdateCMYK() {
@@ -243,12 +261,19 @@ public class ColorConverterApp extends JFrame {
 
     private void updateFromHSVInputs() {
         if (isUpdating) return;
+        
+        // Синхронизация полей модели HSV
+        tH.setText(String.valueOf(sH.getValue()));
+        tS.setText(String.valueOf(sS.getValue()));
+        tV.setText(String.valueOf(sV.getValue()));
+
         float h = sH.getValue() / 360.0f;
         float s = sS.getValue() / 100.0f;
         float v = sV.getValue() / 100.0f;
         
         int rgb = Color.HSBtoRGB(h, s, v);
-        updateAllFromColor(new Color(rgb));
+        // Обновление остальных модели
+        updateAllFromColor(new Color(rgb), ChangeSource.HSV);
     }
 
     private void validateAndUpdateHSV() {
@@ -264,48 +289,54 @@ public class ColorConverterApp extends JFrame {
     }
 
     // Главный метод пересчета
-    private void updateAllFromColor(Color c) {
+    private void updateAllFromColor(Color c, ChangeSource source) {
         isUpdating = true; 
         try {
             colorPreviewPanel.setBackground(c);
 
-            // RGB
-            sR.setValue(c.getRed());   tR.setText(String.valueOf(c.getRed()));
-            sG.setValue(c.getGreen()); tG.setText(String.valueOf(c.getGreen()));
-            sB.setValue(c.getBlue());  tB.setText(String.valueOf(c.getBlue()));
-
-            // HSV
-            float[] hsv = Color.RGBtoHSB(c.getRed(), c.getGreen(), c.getBlue(), null);
-            int h = Math.round(hsv[0] * 360);
-            int s = Math.round(hsv[1] * 100);
-            int v = Math.round(hsv[2] * 100);
-            sH.setValue(h); tH.setText(String.valueOf(h));
-            sS.setValue(s); tS.setText(String.valueOf(s));
-            sV.setValue(v); tV.setText(String.valueOf(v));
-
-            // CMYK
-            double rNorm = c.getRed() / 255.0;
-            double gNorm = c.getGreen() / 255.0;
-            double bNorm = c.getBlue() / 255.0;
-            
-            double kVal = 1.0 - Math.max(rNorm, Math.max(gNorm, bNorm));
-            double cVal = 0, mVal = 0, yVal = 0;
-            
-            if (kVal < 1.0) {
-                cVal = (1.0 - rNorm - kVal) / (1.0 - kVal);
-                mVal = (1.0 - gNorm - kVal) / (1.0 - kVal);
-                yVal = (1.0 - bNorm - kVal) / (1.0 - kVal);
+            // Обновление RGB
+            if (source != ChangeSource.RGB) {
+                sR.setValue(c.getRed());   tR.setText(String.valueOf(c.getRed()));
+                sG.setValue(c.getGreen()); tG.setText(String.valueOf(c.getGreen()));
+                sB.setValue(c.getBlue());  tB.setText(String.valueOf(c.getBlue()));
             }
 
-            int cInt = (int) Math.round(cVal * 100);
-            int mInt = (int) Math.round(mVal * 100);
-            int yInt = (int) Math.round(yVal * 100);
-            int kInt = (int) Math.round(kVal * 100);
+            // Обновление HSV
+            if (source != ChangeSource.HSV) {
+                float[] hsv = Color.RGBtoHSB(c.getRed(), c.getGreen(), c.getBlue(), null);
+                int h = Math.round(hsv[0] * 360);
+                int s = Math.round(hsv[1] * 100);
+                int v = Math.round(hsv[2] * 100);
+                sH.setValue(h); tH.setText(String.valueOf(h));
+                sS.setValue(s); tS.setText(String.valueOf(s));
+                sV.setValue(v); tV.setText(String.valueOf(v));
+            }
 
-            sC.setValue(cInt); tC.setText(String.valueOf(cInt));
-            sM.setValue(mInt); tM.setText(String.valueOf(mInt));
-            sY.setValue(yInt); tY.setText(String.valueOf(yInt));
-            sK.setValue(kInt); tK.setText(String.valueOf(kInt));
+            // Обновление CMYK
+            if (source != ChangeSource.CMYK) {
+                double rNorm = c.getRed() / 255.0;
+                double gNorm = c.getGreen() / 255.0;
+                double bNorm = c.getBlue() / 255.0;
+                
+                double kVal = 1.0 - Math.max(rNorm, Math.max(gNorm, bNorm));
+                double cVal = 0, mVal = 0, yVal = 0;
+                
+                if (kVal < 1.0) {
+                    cVal = (1.0 - rNorm - kVal) / (1.0 - kVal);
+                    mVal = (1.0 - gNorm - kVal) / (1.0 - kVal);
+                    yVal = (1.0 - bNorm - kVal) / (1.0 - kVal);
+                }
+
+                int cInt = (int) Math.round(cVal * 100);
+                int mInt = (int) Math.round(mVal * 100);
+                int yInt = (int) Math.round(yVal * 100);
+                int kInt = (int) Math.round(kVal * 100);
+
+                sC.setValue(cInt); tC.setText(String.valueOf(cInt));
+                sM.setValue(mInt); tM.setText(String.valueOf(mInt));
+                sY.setValue(yInt); tY.setText(String.valueOf(yInt));
+                sK.setValue(kInt); tK.setText(String.valueOf(kInt));
+            }
 
         } finally {
             isUpdating = false;
