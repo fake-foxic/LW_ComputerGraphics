@@ -29,7 +29,7 @@ public class RasterAlgorithmsApp extends JFrame {
         setLocationRelativeTo(null);
         setLayout(new BorderLayout());
 
-        // --- Левая панель управления ---
+        // Левая панель управления
         JPanel controlPanel = new JPanel();
         controlPanel.setLayout(new BoxLayout(controlPanel, BoxLayout.Y_AXIS));
         controlPanel.setBorder(new EmptyBorder(10, 10, 10, 10));
@@ -96,7 +96,7 @@ public class RasterAlgorithmsApp extends JFrame {
         scrollLog.setBorder(new TitledBorder("Точки (Лог)"));
         controlPanel.add(scrollLog);
         
-        // Добавим пояснение про сглаживание
+        // Пояснение про сглаживание
         JTextArea infoArea = new JTextArea("Алгоритм Кастла-Питвея использует целочисленную арифметику для расчета интенсивности двух соседних пикселей, создавая эффект сглаживания (Antialiasing).");
         infoArea.setLineWrap(true);
         infoArea.setWrapStyleWord(true);
@@ -108,11 +108,11 @@ public class RasterAlgorithmsApp extends JFrame {
 
         add(controlPanel, BorderLayout.WEST);
 
-        // --- Сетка ---
+        // Сетка
         gridPanel = new GridPanel();
         add(gridPanel, BorderLayout.CENTER);
 
-        // --- Слушатели ---
+        // Слушатели
         btnDraw.addActionListener(e -> draw());
         btnClear.addActionListener(e -> {
             gridPanel.clearPoints();
@@ -164,7 +164,7 @@ public class RasterAlgorithmsApp extends JFrame {
             StringBuilder sb = new StringBuilder();
             sb.append("Найдено ").append(pixels.size()).append(" точек:\n");
             for (Pixel p : pixels) {
-                // Если прозрачность < 1.0, выводим её в лог
+                // Если прозрачность < 1.0, выводим в лог
                 if (p.opacity < 1.0f) {
                     sb.append(String.format("[%d; %d] op=%.2f\n", p.x, p.y, p.opacity));
                 } else {
@@ -182,9 +182,7 @@ public class RasterAlgorithmsApp extends JFrame {
     }
 }
 
-// ============================================================================
-// ВСПОМОГАТЕЛЬНЫЙ КЛАСС (КООРДИНАТА + ПРОЗРАЧНОСТЬ)
-// ============================================================================
+// Вспомогательный класс
 class Pixel {
     int x, y;
     float opacity; // 0.0 - прозрачный, 1.0 - полностью закрашен
@@ -200,9 +198,7 @@ class Pixel {
     }
 }
 
-// ============================================================================
-// АЛГОРИТМЫ
-// ============================================================================
+// Алгоритмы
 class RasterAlgorithms {
 
     // 1. Пошаговый
@@ -291,9 +287,6 @@ class RasterAlgorithms {
     }
 
     // 4. Алгоритм Кастла-Питвея (Сглаженная линия)
-    // Это целочисленный вариант алгоритма Ву.
-    // Суть: мы ведем ошибку Bresenham, но вместо простого сдвига используем эту ошибку
-    // как меру интенсивности для двух пикселей (основного и "соседнего").
     public static List<Pixel> castlePitteway(int x1, int y1, int x2, int y2) {
         List<Pixel> pixels = new ArrayList<>();
         
@@ -320,14 +313,6 @@ class RasterAlgorithms {
             dx = dy;
             dy = temp;
         }
-
-        // Инициализация переменных
-        // В оригинале используется масштабированная ошибка (например, от 0 до 2*dx)
-        // Для простоты реализации возьмем концепцию алгоритма Ву, но с целочисленным трекером ошибки
-        // Максимальная интенсивность = 255 (условно 1.0). Ошибка ходит от 0 до max.
-        
-        // Пойдем классическим целочисленным путем:
-        // errorAcc накапливает dy/dx. Мы храним его умноженным на dx, чтобы остаться в int.
         
         int errorAcc = 0; // Накопленная ошибка (числитель дроби errorAcc/dx)
         
@@ -335,15 +320,9 @@ class RasterAlgorithms {
         int y = y1;
 
         for (int i = 0; i <= dx; i++) {
-            // Интенсивность зависит от того, насколько "далеко" мы от идеальной линии.
-            // Идеальный Y (или X при swap) лежит где-то между целыми значениями.
-            // errorAcc / dx - это дробная часть смещения.
             
             float intensity2 = (float) errorAcc / dx; // Насколько мы сместились к соседу
             float intensity1 = 1.0f - intensity2;     // Насколько мы остались на основной линии
-
-            // Добавляем две точки: основную и соседнюю
-            // Соседняя точка всегда сдвинута на stepY (или stepX при swap) относительно основной
             
             pixels.add(new Pixel(x, y, intensity1));
             
@@ -356,13 +335,7 @@ class RasterAlgorithms {
             // Итерация
             errorAcc += dy;
             if (errorAcc >= dx) {
-                errorAcc -= dx; // Ошибка переполнилась, переходим к следующему пикселю по побочной оси
-                // Но так как мы уже учли интенсивность "соседа", мы фактически сдвигаем базовую линию
-                // В алгоритме сглаживания "переход" базового пикселя происходит когда errorAcc превышает порог,
-                // но здесь логика чуть хитрее. 
-                // Для простоты реализации "в лоб" (и как часто учат для Кастла-Питвея):
-                // Мы всегда рисуем (x, y) и (x, y+step).
-                // Если ошибка накопилась, мы физически смещаем y.
+                errorAcc -= dx; 
                 if (swap) x += stepX; else y += stepY;
             }
             
@@ -405,9 +378,7 @@ class RasterAlgorithms {
     }
 }
 
-// ============================================================================
-// ВИЗУАЛИЗАЦИЯ (GRID PANEL)
-// ============================================================================
+// Визуализация
 class GridPanel extends JPanel {
     private int cellSize = 20;
     private List<Pixel> pixelsToDraw = new ArrayList<>();
@@ -452,14 +423,14 @@ class GridPanel extends JPanel {
         int centerX = w / 2;
         int centerY = h / 2;
 
-        // --- 1. Сетка ---
+        // 1. Сетка
         g2.setColor(new Color(230, 230, 230)); 
         for (int x = centerX; x < w; x += cellSize) g2.drawLine(x, 0, x, h);
         for (int x = centerX; x > 0; x -= cellSize) g2.drawLine(x, 0, x, h);
         for (int y = centerY; y < h; y += cellSize) g2.drawLine(0, y, w, y);
         for (int y = centerY; y > 0; y -= cellSize) g2.drawLine(0, y, w, y);
 
-        // --- 2. Оси и текст ---
+        // 2. Оси и текст
         g2.setColor(Color.BLACK);
         g2.setStroke(new BasicStroke(1));
         g2.drawLine(centerX, 0, centerX, h);
@@ -472,30 +443,30 @@ class GridPanel extends JPanel {
         int maxStepsX = w / 2 / cellSize + 1;
         int maxStepsY = h / 2 / cellSize + 1;
 
-        // X Axis
+        // ось X
         for (int i = 1; i < maxStepsX; i++) {
-            // Right
+            // ->
             int px = centerX + i * cellSize;
             g2.drawLine(px, centerY - 2, px, centerY + 2);
             String val = String.valueOf(i);
             g2.drawString(val, px - fm.stringWidth(val) / 2, centerY + textOffset);
             
-            // Left
+            // <-
             px = centerX - i * cellSize;
             g2.drawLine(px, centerY - 2, px, centerY + 2);
             val = String.valueOf(-i);
             g2.drawString(val, px - fm.stringWidth(val) / 2, centerY + textOffset);
         }
 
-        // Y Axis
+        // ось Y
         for (int i = 1; i < maxStepsY; i++) {
-            // Up
+            // +
             int py = centerY - i * cellSize;
             g2.drawLine(centerX - 2, py, centerX + 2, py);
             String val = String.valueOf(i);
             g2.drawString(val, centerX - textOffset - fm.stringWidth(val), py + fm.getAscent() / 2 - 1);
             
-            // Down
+            // -
             py = centerY + i * cellSize;
             g2.drawLine(centerX - 2, py, centerX + 2, py);
             val = String.valueOf(-i);
@@ -506,32 +477,24 @@ class GridPanel extends JPanel {
         g2.drawString("X", w - 15, centerY - 5);
         g2.drawString("Y", centerX + 5, 15);
 
-        // --- 3. Рисуем пиксели (с учетом альфа-канала) ---
-        // Базовый цвет - синий (RoyalBlue)
+        // Рисуем пиксели
         int red = 65, green = 105, blue = 225;
         
         for (Pixel p : pixelsToDraw) {
             int screenX = centerX + p.x * cellSize;
             int screenY = centerY - p.y * cellSize - cellSize;
             
-            // Рассчитываем альфу (0..255)
-            // Усиливаем видимость: даже слабая интенсивность должна быть чуть видна
-            // Но не более 255. 
-            // Используем квадратичную зависимость для красоты или линейную.
-            // p.opacity идет от 0.0 до 1.0
-            
             int alpha = Math.round(p.opacity * 255);
             if (alpha < 0) alpha = 0;
             if (alpha > 255) alpha = 255;
             
-            // Если альфа 0, нет смысла рисовать
             if (alpha > 0) {
                 g2.setColor(new Color(red, green, blue, alpha));
                 g2.fillRect(screenX + 1, screenY + 1, cellSize - 1, cellSize - 1);
             }
         }
         
-        // --- 4. Инфо ---
+        // 4. Инфо
         String scaleInfo = "Цена деления: 1 ед.";
         String zoomInfo = "Масштаб: " + cellSize + " px/ед.";
         
